@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Fallas · Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#0a0c0f; --surface:#111318; --surface2:#181c24;
+    --border:#1e2530; --border2:#252d3a;
+    --accent:#f5820a; --accent2:#e03c3c; --accent3:#2dd4bf;
+    --text:#e8eaf0; --text2:#8a93a8; --text3:#4a5568;
+    --mec:#f5820a; --elec:#3b82f6;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:'Barlow Condensed',sans-serif; font-size:15px; min-height:100vh;
+    background-image:
+      radial-gradient(ellipse 80% 40% at 50% -10%, rgba(245,130,10,0.06) 0%, transparent 60%),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.013) 39px, rgba(255,255,255,0.013) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.013) 39px, rgba(255,255,255,0.013) 40px);
+  }
+
+  /* CONFIG BANNER */
+  #config-banner {
+    background:linear-gradient(90deg,rgba(245,130,10,0.15),rgba(245,130,10,0.05));
+    border-bottom:1px solid rgba(245,130,10,0.35);
+    padding:14px 36px; display:flex; align-items:center; gap:14px;
+    flex-wrap:wrap;
+  }
+  #config-banner label { font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:600; white-space:nowrap; }
+  #sheet-url {
+    flex:1; min-width:300px; background:var(--surface2); border:1px solid var(--border2);
+    border-radius:6px; padding:8px 12px; color:var(--text);
+    font-family:'Share Tech Mono'; font-size:12px; outline:none;
+    transition:border-color .2s;
+  }
+  #sheet-url:focus { border-color:var(--accent); }
+  #sheet-url::placeholder { color:var(--text3); }
+  #btn-load {
+    background:var(--accent); color:#000; border:none; border-radius:6px;
+    padding:9px 20px; font-family:'Rajdhani',sans-serif; font-size:14px;
+    font-weight:700; letter-spacing:.06em; cursor:pointer;
+    transition:opacity .2s; white-space:nowrap;
+  }
+  #btn-load:hover { opacity:.85; }
+  #btn-load:disabled { opacity:.4; cursor:default; }
+  #load-status { font-size:12px; color:var(--text2); font-family:'Share Tech Mono'; }
+
+  /* HOW-TO */
+  #howto {
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    margin:20px 32px; padding:22px 26px; display:flex; gap:32px; flex-wrap:wrap;
+  }
+  .step { display:flex; gap:12px; align-items:flex-start; flex:1; min-width:200px; }
+  .step-num {
+    width:28px; height:28px; border-radius:6px; background:rgba(245,130,10,0.15);
+    border:1px solid rgba(245,130,10,0.35); display:grid; place-items:center;
+    font-family:'Rajdhani',sans-serif; font-size:15px; font-weight:700; color:var(--accent);
+    flex-shrink:0;
+  }
+  .step-text { font-size:13px; line-height:1.5; color:var(--text2); }
+  .step-text strong { color:var(--text); display:block; margin-bottom:2px; }
+
+  /* LOADING */
+  #loading {
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    padding:60px; gap:16px;
+  }
+  .spinner {
+    width:40px; height:40px; border:3px solid var(--border2);
+    border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loading p { font-family:'Share Tech Mono'; font-size:12px; color:var(--text2); letter-spacing:.1em; }
+
+  /* ERROR */
+  #error-msg {
+    display:none; margin:0 32px; background:rgba(224,60,60,0.1);
+    border:1px solid rgba(224,60,60,0.35); border-radius:8px; padding:16px 20px;
+    font-size:13px; color:#fca5a5; line-height:1.6;
+  }
+
+  /* HEADER */
+  header {
+    padding:24px 36px 20px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    background:linear-gradient(180deg, rgba(245,130,10,0.04) 0%, transparent 100%);
+  }
+  .logo-block { display:flex; align-items:center; gap:14px; }
+  .logo-icon { width:44px; height:44px; border-radius:8px; background:var(--accent); display:grid; place-items:center; font-size:22px; box-shadow:0 0 20px rgba(245,130,10,0.4); }
+  .logo-text h1 { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:22px; letter-spacing:.08em; text-transform:uppercase; line-height:1; }
+  .logo-text p { font-family:'Share Tech Mono'; font-size:11px; color:var(--text2); letter-spacing:.12em; margin-top:3px; }
+  .header-meta { display:flex; gap:28px; align-items:center; }
+  .meta-item label { display:block; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--text3); }
+  .meta-item span { font-family:'Share Tech Mono'; font-size:13px; color:var(--accent); }
+  .status-pill { display:flex; align-items:center; gap:8px; background:rgba(245,130,10,0.1); border:1px solid rgba(245,130,10,0.3); padding:6px 14px; border-radius:20px; }
+  .pulse { width:8px; height:8px; border-radius:50%; background:var(--accent); animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(245,130,10,0.5)} 50%{opacity:.8;box-shadow:0 0 0 6px rgba(245,130,10,0)} }
+  .status-pill span { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:600; }
+
+  /* MAIN */
+  #dashboard { display:none; }
+  main { padding:20px 32px 40px; display:grid; gap:18px; }
+
+  /* KPI */
+  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+  .kpi { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px 20px; position:relative; overflow:hidden; }
+  .kpi::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--kpi-color,var(--accent)); }
+  .kpi-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--text2); margin-bottom:6px; }
+  .kpi-value { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:42px; line-height:1; color:var(--kpi-color,var(--text)); }
+  .kpi-value.sm { font-size:22px; padding-top:6px; }
+  .kpi-value span { font-size:16px; color:var(--text2); font-weight:400; }
+  .kpi-sub { font-size:11px; color:var(--text3); margin-top:5px; }
+
+  /* ALERT */
+  .alert-card { background:linear-gradient(135deg,rgba(224,60,60,0.12),rgba(224,60,60,0.04)); border:1px solid rgba(224,60,60,0.35); border-radius:10px; padding:16px 20px; display:flex; gap:16px; align-items:flex-start; position:relative; overflow:hidden; }
+  .alert-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent2); }
+  .alert-badge { display:inline-block; background:var(--accent2); padding:2px 8px; border-radius:4px; font-size:10px; letter-spacing:.12em; text-transform:uppercase; font-weight:600; margin-bottom:5px; }
+  .alert-title { font-family:'Rajdhani',sans-serif; font-size:17px; font-weight:700; color:#fff; line-height:1.2; }
+  .alert-meta { font-size:12px; color:var(--text2); margin-top:4px; }
+  .alert-meta strong { color:var(--accent2); }
+  .alert-duration { margin-left:auto; flex-shrink:0; text-align:center; background:rgba(224,60,60,0.15); border:1px solid rgba(224,60,60,0.3); border-radius:8px; padding:10px 16px; }
+  .alert-duration .num { font-family:'Rajdhani',sans-serif; font-size:34px; font-weight:700; color:var(--accent2); line-height:1; }
+  .alert-duration .lbl { font-size:11px; color:var(--text2); letter-spacing:.1em; }
+
+  /* CARDS */
+  .charts-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; }
+  .charts-row2 { display:grid; grid-template-columns:2fr 1fr; gap:18px; }
+  .charts-row3 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .mes-row { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .grupo-row { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px 20px; display:flex; flex-direction:column; }
+  .card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+  .card-title { font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+  .card-title small { display:block; font-size:10px; font-weight:400; letter-spacing:.12em; color:var(--text3); margin-top:1px; }
+  .card-badge { font-family:'Share Tech Mono'; font-size:11px; background:var(--surface2); border:1px solid var(--border2); padding:3px 8px; border-radius:4px; color:var(--text2); }
+  .chart-wrap { flex:1; position:relative; min-height:200px; }
+
+  /* HBAR */
+  .hbar-wrap { flex:1; }
+  .hbar-item { margin-bottom:11px; }
+  .hbar-header { display:flex; justify-content:space-between; margin-bottom:4px; }
+  .hbar-name { font-size:12px; color:var(--text2); }
+  .hbar-val { font-family:'Share Tech Mono'; font-size:11px; color:var(--accent3); }
+  .hbar-track { height:7px; background:var(--border2); border-radius:4px; overflow:hidden; }
+  .hbar-fill { height:100%; border-radius:4px; transition:width 1.2s ease; width:0%; }
+
+  /* DONUT */
+  .gauge-row { display:flex; gap:14px; align-items:center; flex:1; }
+  .gauge-donut { position:relative; width:150px; height:150px; flex-shrink:0; }
+  .gauge-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; }
+  .gauge-center .pct { font-family:'Rajdhani',sans-serif; font-size:28px; font-weight:700; color:var(--mec); line-height:1; }
+  .gauge-center .lbl { font-size:10px; color:var(--text3); letter-spacing:.1em; }
+  .gauge-legend { flex:1; }
+  .legend-item { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+  .legend-name { font-size:13px; color:var(--text2); flex:1; }
+  .legend-count { font-family:'Rajdhani',sans-serif; font-size:20px; font-weight:700; }
+  .legend-bar-wrap { height:4px; background:var(--border2); border-radius:2px; margin-top:2px; }
+  .legend-bar { height:100%; border-radius:2px; }
+
+  /* COMP GRID */
+  .comp-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; flex:1; }
+  .comp-item { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; }
+  .comp-item:first-child { border-color:rgba(245,130,10,0.5); background:rgba(245,130,10,0.06); }
+  .comp-cnt { font-family:'Rajdhani',sans-serif; font-size:30px; font-weight:700; color:var(--accent); line-height:1; }
+  .comp-name { font-size:10px; color:var(--text2); margin-top:3px; text-transform:uppercase; letter-spacing:.07em; }
+
+  /* RANK */
+  .rank-row { display:grid; grid-template-columns:22px 1fr auto auto; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .rank-row:last-child { border-bottom:none; }
+  .rank-num { font-family:'Share Tech Mono'; font-size:11px; color:var(--text3); text-align:center; }
+  .rank-name { color:var(--text); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .rank-bar-cell { width:70px; }
+  .rank-bar-bg { height:5px; background:var(--border2); border-radius:3px; }
+  .rank-bar-fill { height:100%; border-radius:3px; background:var(--accent); transition:width 1s ease; width:0%; }
+  .rank-val { font-family:'Share Tech Mono'; font-size:11px; color:var(--accent); white-space:nowrap; }
+
+  /* MES */
+  .mes-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px 20px; display:flex; flex-direction:column; }
+  .mes-split { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:4px; flex:1; }
+  .mes-block { background:var(--surface2); border:1px solid var(--border2); border-radius:8px; padding:14px; }
+  .mes-block.active { border-color:rgba(245,130,10,0.45); background:rgba(245,130,10,0.06); }
+  .mes-month { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--text3); margin-bottom:5px; }
+  .mes-num { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:44px; line-height:1; }
+  .mes-unit { font-size:12px; color:var(--text2); margin-top:3px; }
+  .mes-delta { display:inline-flex; align-items:center; font-size:11px; margin-top:6px; font-weight:600; padding:2px 7px; border-radius:4px; }
+  .mes-delta.up { background:rgba(224,60,60,0.15); color:var(--accent2); }
+  .mes-delta.down { background:rgba(45,212,191,0.12); color:var(--accent3); }
+
+  /* GRUPO */
+  .grupo-cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; flex:1; }
+  .grupo-item { border-radius:8px; padding:14px 12px; border:1px solid var(--border2); background:var(--surface2); transition:transform .2s; }
+  .grupo-item:hover { transform:translateY(-2px); }
+  .grupo-item.winner { border-color:rgba(245,130,10,0.5); background:rgba(245,130,10,0.07); grid-column:1/-1; }
+  .grupo-item.winner::before { content:"▶ MÁS COMPROMETIDO"; display:block; font-size:9px; letter-spacing:.16em; color:var(--accent); margin-bottom:6px; font-weight:700; }
+  .grupo-icon { font-size:20px; margin-bottom:6px; }
+  .grupo-name { font-family:'Rajdhani',sans-serif; font-size:15px; font-weight:700; letter-spacing:.06em; }
+  .grupo-fallas { font-family:'Share Tech Mono'; font-size:11px; color:var(--text3); margin-top:2px; }
+  .grupo-hrs { font-family:'Rajdhani',sans-serif; font-size:30px; font-weight:700; line-height:1; margin-top:4px; }
+  .grupo-hrs small { font-size:13px; color:var(--text2); font-weight:400; }
+  .grupo-bar-track { height:4px; background:var(--border); border-radius:2px; margin-top:8px; }
+  .grupo-bar-fill { height:100%; border-radius:2px; transition:width 1.2s ease; width:0%; }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<!-- CONFIG BANNER -->
+<div id="config-banner">
+  <label>⚡ Google Sheet URL (CSV)</label>
+  <input id="sheet-url" type="text"
+    placeholder="https://docs.google.com/spreadsheets/d/TU_ID/pub?output=csv"
+    value="">
+  <button id="btn-load" onclick="loadData()">Cargar Datos</button>
+  <span id="load-status"></span>
+</div>
+
+<!-- HOW-TO (se oculta al cargar datos) -->
+<div id="howto">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-text">
+      <strong>Sube tu Excel a Google Sheets</strong>
+      Abre sheets.google.com → Archivo → Importar → sube tu .xlsx
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-text">
+      <strong>Publica la hoja como CSV</strong>
+      Archivo → Compartir → Publicar en la web → selecciona la hoja → formato CSV → Publicar
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-text">
+      <strong>Pega la URL arriba y clic en Cargar</strong>
+      El dashboard se actualizará automáticamente cada vez que abras el archivo
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-text">
+      <strong>Guarda este HTML</strong>
+      La URL queda guardada en el archivo. La próxima vez se carga sola al abrir
+    </div>
+  </div>
+</div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>CARGANDO DATOS DESDE GOOGLE SHEETS...</p>
+</div>
+
+<div id="error-msg"></div>
+
+<!-- DASHBOARD (se muestra tras cargar) -->
+<div id="dashboard">
+  <header>
+    <div class="logo-block">
+      <div class="logo-icon">⚙</div>
+      <div class="logo-text">
+        <h1>Dashboard de Fallas</h1>
+        <p>INDICADOR MENSUAL · MANTENIMIENTO INDUSTRIAL</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div class="meta-item"><label>Período</label><span id="hdr-periodo">—</span></div>
+      <div class="meta-item"><label>Registros</label><span id="hdr-registros">—</span></div>
+      <div class="meta-item"><label>Última carga</label><span id="hdr-fecha">—</span></div>
+      <div class="status-pill"><div class="pulse"></div><span>Google Sheets Live</span></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- KPIs -->
+    <div class="kpi-row">
+      <div class="kpi" style="--kpi-color:#f5820a">
+        <div class="kpi-label">Total de Fallas</div>
+        <div class="kpi-value" id="k-total">—</div>
+        <div class="kpi-sub" id="k-total-sub">Eventos registrados</div>
+      </div>
+      <div class="kpi" style="--kpi-color:#e03c3c">
+        <div class="kpi-label">Tiempo Total de Falla</div>
+        <div class="kpi-value" id="k-horas">—<span> hrs</span></div>
+        <div class="kpi-sub">Horas acumuladas de detención</div>
+      </div>
+      <div class="kpi" style="--kpi-color:#3b82f6">
+        <div class="kpi-label">Línea Más Afectada</div>
+        <div class="kpi-value sm" id="k-linea">—</div>
+        <div class="kpi-sub" id="k-linea-sub">—</div>
+      </div>
+      <div class="kpi" style="--kpi-color:#2dd4bf">
+        <div class="kpi-label">Componente Crítico</div>
+        <div class="kpi-value sm" id="k-comp">—</div>
+        <div class="kpi-sub" id="k-comp-sub">—</div>
+      </div>
+    </div>
+
+    <!-- Alerta falla más comprometedora -->
+    <div class="alert-card">
+      <div style="font-size:26px;flex-shrink:0">🚨</div>
+      <div>
+        <div class="alert-badge">⚠ Falla Más Comprometedora del Período</div>
+        <div class="alert-title" id="worst-desc">—</div>
+        <div class="alert-meta" id="worst-meta">—</div>
+      </div>
+      <div class="alert-duration">
+        <div class="num" id="worst-hrs">—</div>
+        <div class="lbl">HORAS</div>
+      </div>
+    </div>
+
+    <!-- Row 1 -->
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Fallas por Línea<small>Nº de eventos</small></div><div class="card-badge">COUNT</div></div>
+        <div class="hbar-wrap" id="hbar-fallas"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Tiempo de Falla<small>Horas por línea</small></div><div class="card-badge">HRS</div></div>
+        <div class="hbar-wrap" id="hbar-horas"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Tipo de Falla<small>Mecánica vs Eléctrica</small></div><div class="card-badge">%</div></div>
+        <div class="gauge-row">
+          <div class="gauge-donut">
+            <canvas id="donutChart"></canvas>
+            <div class="gauge-center">
+              <div class="pct" id="mec-pct">—%</div>
+              <div class="lbl">MECÁNICA</div>
+            </div>
+          </div>
+          <div class="gauge-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background:var(--mec)"></div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="legend-name">Mecánica</span>
+                  <span class="legend-count" style="color:var(--mec)" id="cnt-mec">—</span>
+                </div>
+                <div class="legend-bar-wrap"><div class="legend-bar" id="bar-mec" style="background:var(--mec);width:0%;transition:width 1s ease"></div></div>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:var(--elec)"></div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="legend-name">Eléctrica</span>
+                  <span class="legend-count" style="color:var(--elec)" id="cnt-elec">—</span>
+                </div>
+                <div class="legend-bar-wrap"><div class="legend-bar" id="bar-elec" style="background:var(--elec);width:0%;transition:width 1s ease"></div></div>
+              </div>
+            </div>
+            <div id="detencion-box" style="margin-top:12px;padding:9px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
+              <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Detenciones reales</div>
+              <div style="font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700"><span id="cnt-det">—</span> <span style="font-size:13px;color:var(--text2)" id="det-pct"></span></div>
+              <div style="font-size:11px;color:var(--text3)" id="det-sub">con detención de producción</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2 -->
+    <div class="charts-row2">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Evolución Temporal<small>Fallas por día</small></div><div class="card-badge">TIMELINE</div></div>
+        <div class="chart-wrap" style="min-height:190px"><canvas id="timelineChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Componentes Críticos<small>Top afectados</small></div><div class="card-badge">RANKING</div></div>
+        <div class="comp-grid" id="comp-grid"></div>
+      </div>
+    </div>
+
+    <!-- Row 3 -->
+    <div class="charts-row3">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Equipos con Más Fallas<small>Top sub-equipos</small></div><div class="card-badge">TOP 6</div></div>
+        <div class="chart-wrap" style="min-height:220px"><canvas id="equiposChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Ranking Tiempo Perdido<small>Horas por línea</small></div><div class="card-badge">HRS</div></div>
+        <div id="rank-table"></div>
+      </div>
+    </div>
+
+    <!-- Row 4: Por Mes -->
+    <div class="mes-row">
+      <div class="mes-card">
+        <div class="card-header"><div class="card-title">Fallas por Mes<small>Comparativo mensual</small></div><div class="card-badge">MENSUAL</div></div>
+        <div class="mes-split" id="mes-fallas-split"></div>
+        <div id="mes-fallas-bar" style="margin-top:12px"></div>
+      </div>
+      <div class="mes-card">
+        <div class="card-header"><div class="card-title">Tiempo de Falla por Mes<small>Horas totales</small></div><div class="card-badge">HRS</div></div>
+        <div class="mes-split" id="mes-horas-split"></div>
+        <div id="mes-horas-bars" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- Row 5: Grupos -->
+    <div class="grupo-row">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Grupo Más Comprometido<small>Tuberas · Perfileras · Galvanizado · Cortadoras</small></div><div class="card-badge">GRUPOS</div></div>
+        <div class="grupo-cards" id="grupo-cards"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Grupos por Mes<small>Horas perdidas comparativo</small></div><div class="card-badge">FEB · MAR</div></div>
+        <div class="chart-wrap" style="min-height:220px"><canvas id="gruposChart"></canvas></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   COLUMN MAP — se detecta automáticamente desde el header CSV
+   ═══════════════════════════════════════════ */
+function buildColMap(header) {
+  const map = {};
+  header.forEach((h, i) => {
+    const n = h.toLowerCase().trim()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove accents
+    if (n.includes('fecha')) map.fecha = i;
+    else if (n.includes('linea') || n.includes('elaboracion')) map.linea = i;
+    else if (n.includes('duracion') || n === 'duraci n') map.duracion = i;
+    else if (n.includes('grupo equipo') || n === 'grupo') map.grupoEquipo = i;
+    else if (n.includes('equipo') || n.includes('sub equipo')) map.equipo = i;
+    else if (n.includes('componente')) map.componente = i;
+    else if (n.includes('tipo')) map.tipoFalla = i;
+    else if (n.includes('detenci') || n === 'detencion') map.detencion = i;
+    else if (n.includes('descripcion') || n.includes('descripci')) map.descripcion = i;
+  });
+  // fallback to positional if not found
+  if (map.fecha === undefined) map.fecha = 0;
+  if (map.linea === undefined) map.linea = 1;
+  if (map.duracion === undefined) map.duracion = 4;
+  if (map.equipo === undefined) map.equipo = 6;
+  if (map.componente === undefined) map.componente = 7;
+  if (map.tipoFalla === undefined) map.tipoFalla = 8;
+  if (map.detencion === undefined) map.detencion = 9;
+  if (map.descripcion === undefined) map.descripcion = 11;
+  return map;
+}
+
+/* ── Persistent URL ── */
+const STORAGE_KEY = 'dashboard_sheet_url';
+const savedUrl = localStorage.getItem(STORAGE_KEY);
+if (savedUrl) document.getElementById('sheet-url').value = savedUrl;
+
+/* ── Chart instances (to destroy on reload) ── */
+let charts = {};
+
+/* ══════════════════════════════════════
+   PARSE DURATION: handles "H:MM:SS", "HH:MM:SS", Excel decimal
+   ══════════════════════════════════════ */
+function parseDuration(val) {
+  if (!val || val === '') return 0;
+  val = String(val).trim();
+  // "0 days HH:MM:SS" format (pandas export)
+  const dayMatch = val.match(/(\d+)\s+days?\s+(\d+):(\d+):(\d+)/i);
+  if (dayMatch) {
+    return parseInt(dayMatch[1])*24 + parseInt(dayMatch[2]) + parseInt(dayMatch[3])/60 + parseInt(dayMatch[4])/3600;
+  }
+  // "HH:MM:SS" or "H:MM:SS"
+  const timeMatch = val.match(/^(\d+):(\d{2}):(\d{2})$/);
+  if (timeMatch) {
+    return parseInt(timeMatch[1]) + parseInt(timeMatch[2])/60 + parseInt(timeMatch[3])/3600;
+  }
+  // Pure integer or decimal = MINUTES (Google Sheets exports duration in minutes)
+  const num = parseFloat(val);
+  if (!isNaN(num) && num > 0) return num / 60;
+  return 0;
+}
+
+function grupoLinea(linea) {
+  const l = (linea||'').toUpperCase();
+  if (l.includes('TUBERA') || l.includes('METFOR')) return 'TUBERAS';
+  if (l.includes('PERFILERA')) return 'PERFILERAS';
+  if (l.includes('GALVATEC')) return 'GALVANIZADO';
+  if (l.includes('CORTADORA')) return 'CORTADORAS';
+  return 'OTRO';
+}
+
+/* ══════════════════════════════════════
+   LOAD DATA
+   ══════════════════════════════════════ */
+async function loadData() {
+  const url = document.getElementById('sheet-url').value.trim();
+  if (!url) { showError('Por favor ingresa la URL de tu Google Sheet publicado como CSV.'); return; }
+
+  localStorage.setItem(STORAGE_KEY, url);
+  setStatus('⏳ Cargando...');
+  document.getElementById('btn-load').disabled = true;
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('error-msg').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'none';
+
+  try {
+    // Use CORS proxy for Google Sheets
+    // Try multiple CORS proxies in order
+    const proxies = [
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      `https://cors-anywhere.herokuapp.com/${url}`,
+    ];
+    let res = null, lastErr = '';
+    for (const proxyUrl of proxies) {
+      try {
+        res = await fetch(proxyUrl);
+        if (res.ok) break;
+        lastErr = `HTTP ${res.status}`;
+        res = null;
+      } catch(e) { lastErr = e.message; res = null; }
+    }
+    if (!res) throw new Error(lastErr || 'Failed to fetch');
+    const csv = await res.text();
+    const rows = parseCSV(csv);
+    if (rows.length < 2) throw new Error('El archivo parece estar vacío o el formato no es correcto.');
+    processAndRender(rows);
+    document.getElementById('howto').style.display = 'none';
+    setStatus('✅ Datos cargados · ' + (rows.length-1) + ' registros');
+  } catch(e) {
+    showError(`No se pudo cargar el archivo.<br><br>
+      <strong>Verifica que:</strong><br>
+      • La URL sea la de "Publicar en la web" como CSV (no la URL normal de edición)<br>
+      • La hoja esté publicada públicamente<br>
+      • El formato sea: <code>https://docs.google.com/spreadsheets/d/.../pub?output=csv</code><br><br>
+      Error técnico: ${e.message}`);
+  } finally {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('btn-load').disabled = false;
+  }
+}
+
+function setStatus(msg) { document.getElementById('load-status').textContent = msg; }
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.innerHTML = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+/* ══════════════════════════════════════
+   CSV PARSER (handles quoted fields)
+   ══════════════════════════════════════ */
+function parseCSV(text) {
+  const rows = [];
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    cols.push(cur.trim());
+    rows.push(cols);
+  }
+  return rows;
+}
+
+/* ══════════════════════════════════════
+   PROCESS & RENDER
+   ══════════════════════════════════════ */
+function processAndRender(rows) {
+  const header = rows[0];
+  const COL = buildColMap(header);
+  console.log('Column map:', COL);
+  console.log('Header:', header);
+  console.log('First data row:', rows[1]);
+  const data = rows.slice(1).filter(r => r.some(c => c));
+
+  // Validate CSV looks correct
+  if (!header.some(h => h.toLowerCase().includes('fecha') || h.toLowerCase().includes('linea'))) {
+    throw new Error('El archivo no parece tener el formato correcto. Verifica que la URL sea la de "Publicar como CSV".');
+  }
+
+  // Parse rows into objects
+  const records = data.map(r => ({
+    fecha:      r[COL.fecha] || '',
+    linea:      r[COL.linea] || '',
+    equipo:     r[COL.equipo] || '',
+    componente: (r[COL.componente] || '').trim(),
+    tipo:       r[COL.tipoFalla] || '',
+    detencion:  r[COL.detencion] || '',
+    descripcion:r[COL.descripcion] || '',
+    horas:      parseDuration(r[COL.duracion]),
+    mes:        getMes(r[COL.fecha]),
+    grupo:      grupoLinea(r[COL.linea]),
+  })).filter(r => r.linea && r.linea.length > 1 && !r.linea.startsWith('#'));
+
+  if (records.length === 0) throw new Error('No se encontraron filas con datos válidos.');
+
+  const n = records.length;
+  const totalHoras = records.reduce((s,r) => s+r.horas, 0);
+
+  // Aggregations
+  const byLinea    = countBy(records, 'linea');
+  const horaLinea  = sumBy(records, 'linea', 'horas');
+  const byTipo     = countBy(records, 'tipo');
+  const byComp     = countBy(records, 'componente');
+  const byEquipo   = countBy(records, 'equipo');
+  const byMes      = countBy(records, 'mes');
+  const horasMes   = sumBy(records, 'mes', 'horas');
+  const byGrupo    = countBy(records, 'grupo');
+  const horasGrupo = sumBy(records, 'grupo', 'horas');
+  const byDia      = countBy(records, 'fecha');
+  const byDetencion= countBy(records, 'detencion');
+
+  // Worst failure
+  const worst = records.reduce((a,b) => a.horas >= b.horas ? a : b);
+
+  // Meses sorted
+  const meses = Object.keys(byMes).sort();
+
+  // Header info
+  const allFechas = records.map(r=>r.fecha).filter(Boolean).sort();
+  document.getElementById('hdr-periodo').textContent = formatPeriodo(allFechas);
+  document.getElementById('hdr-registros').textContent = n;
+  document.getElementById('hdr-fecha').textContent = new Date().toLocaleDateString('es-CL');
+
+  // ── KPIs ──
+  animCount('k-total', n, 1000);
+  animCount('k-horas', totalHoras, 1200, 1);
+  const topLinea = topN(horaLinea, 1)[0];
+  document.getElementById('k-linea').textContent = topLinea[0];
+  document.getElementById('k-linea-sub').textContent = topLinea[1].toFixed(1)+' hrs · '+byLinea[topLinea[0]]+' eventos';
+  const topComp = topN(byComp, 1)[0];
+  document.getElementById('k-comp').textContent = topComp[0];
+  document.getElementById('k-comp-sub').textContent = topComp[1]+' fallas · Más recurrente';
+
+  // ── WORST ──
+  document.getElementById('worst-desc').textContent = worst.descripcion || '—';
+  document.getElementById('worst-meta').innerHTML =
+    `Línea: <strong>${worst.linea}</strong> &nbsp;·&nbsp; Tipo: <strong>${worst.tipo}</strong> &nbsp;·&nbsp; Equipo: <strong>${worst.equipo}</strong>`;
+  document.getElementById('worst-hrs').textContent = worst.horas.toFixed(1);
+
+  // ── HBARS fallas ──
+  renderHBar('hbar-fallas', topN(byLinea,10), Math.max(...Object.values(byLinea)),
+    'linear-gradient(90deg,#f5820a,rgba(245,130,10,.4))', v=>v);
+  // ── HBARS horas ──
+  renderHBar('hbar-horas', topN(horaLinea,10), Math.max(...Object.values(horaLinea)),
+    'linear-gradient(90deg,#e03c3c,rgba(224,60,60,.4))', v=>v.toFixed(1)+' h');
+
+  // ── DONUT ──
+  const mecCount = byTipo['Mecánica'] || byTipo['Mecanica'] || 0;
+  const elecCount = byTipo['Eléctrica'] || byTipo['Electrica'] || byTipo['Electrica'] || 0;
+  const total = mecCount + elecCount || 1;
+  const mecPct = (mecCount/total*100).toFixed(1);
+  document.getElementById('mec-pct').textContent = mecPct + '%';
+  document.getElementById('cnt-mec').textContent = mecCount;
+  document.getElementById('cnt-elec').textContent = elecCount;
+  setTimeout(()=>{
+    document.getElementById('bar-mec').style.width = mecPct+'%';
+    document.getElementById('bar-elec').style.width = (100-parseFloat(mecPct))+'%';
+  },300);
+  const detSi = byDetencion['Si'] || byDetencion['SI'] || byDetencion['sí'] || 0;
+  document.getElementById('cnt-det').textContent = detSi + ' / ' + n;
+  document.getElementById('det-pct').textContent = '('+( detSi/n*100).toFixed(1)+'%)';
+  destroyChart('donutChart');
+  charts['donutChart'] = new Chart(document.getElementById('donutChart'), {
+    type:'doughnut',
+    data:{ labels:['Mecánica','Eléctrica'],
+      datasets:[{ data:[mecCount, elecCount],
+        backgroundColor:['rgba(245,130,10,0.85)','rgba(59,130,246,0.85)'],
+        borderColor:['#0a0c0f','#0a0c0f'], borderWidth:3, hoverOffset:6 }] },
+    options:{ cutout:'72%', plugins:{ legend:{display:false} }, animation:{duration:1200} }
+  });
+
+  // ── TIMELINE ──
+  const timeLabels = Object.keys(byDia).sort();
+  const timeVals   = timeLabels.map(k=>byDia[k]);
+  destroyChart('timelineChart');
+  charts['timelineChart'] = new Chart(document.getElementById('timelineChart'), {
+    type:'bar',
+    data:{ labels:timeLabels.map(d=>d.slice(5)),
+      datasets:[{ label:'Fallas', data:timeVals,
+        backgroundColor: timeVals.map(v=>v>=8?'rgba(224,60,60,0.8)':v>=5?'rgba(245,130,10,0.75)':'rgba(245,130,10,0.45)'),
+        borderColor: timeVals.map(v=>v>=8?'#e03c3c':v>=5?'#f5820a':'rgba(245,130,10,0.6)'),
+        borderWidth:1.5, borderRadius:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{maxRotation:45,font:{size:10}}},
+               y:{grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true} },
+      plugins:{ legend:{display:false} }, animation:{duration:900} }
+  });
+
+  // ── COMP GRID ──
+  const grid = document.getElementById('comp-grid');
+  grid.innerHTML = '';
+  topN(byComp, 8).forEach(([name, cnt]) => {
+    grid.innerHTML += `<div class="comp-item"><div class="comp-cnt">${cnt}</div><div class="comp-name">${name}</div></div>`;
+  });
+
+  // ── EQUIPOS CHART ──
+  const topEq = topN(byEquipo, 6);
+  destroyChart('equiposChart');
+  charts['equiposChart'] = new Chart(document.getElementById('equiposChart'), {
+    type:'bar',
+    data:{ labels: topEq.map(e=>e[0]),
+      datasets:[{ label:'Fallas', data:topEq.map(e=>e[1]),
+        backgroundColor:['rgba(45,212,191,0.8)','rgba(45,212,191,0.65)','rgba(45,212,191,0.5)',
+                         'rgba(45,212,191,0.4)','rgba(45,212,191,0.3)','rgba(45,212,191,0.2)'],
+        borderColor:'rgba(45,212,191,0.9)', borderWidth:1.5, borderRadius:4 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{color:'rgba(255,255,255,0.04)'}}, y:{grid:{display:false},ticks:{font:{size:11}}} },
+      plugins:{ legend:{display:false} }, animation:{duration:900} }
+  });
+
+  // ── RANK TABLE ──
+  const maxH = Math.max(...Object.values(horaLinea));
+  const rt = document.getElementById('rank-table');
+  rt.innerHTML = '';
+  topN(horaLinea, 8).forEach(([name,hrs],i) => {
+    rt.innerHTML += `<div class="rank-row">
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-name">${name}</div>
+      <div class="rank-bar-cell"><div class="rank-bar-bg"><div class="rank-bar-fill" data-w="${(hrs/maxH*100).toFixed(0)}%"></div></div></div>
+      <div class="rank-val">${hrs.toFixed(1)} h</div></div>`;
+  });
+  setTimeout(()=>rt.querySelectorAll('.rank-bar-fill').forEach(el=>el.style.width=el.dataset.w),300);
+
+  // ── MES FALLAS ──
+  renderMesSplit('mes-fallas-split', 'mes-fallas-bar', byMes, meses, v=>v, 'fallas', '#f5820a', '#60a5fa');
+  // ── MES HORAS ──
+  renderMesSplit('mes-horas-split', 'mes-horas-bars', horasMes, meses, v=>v.toFixed(1)+' h', 'hrs', '#e03c3c', '#60a5fa');
+
+  // ── GRUPO CARDS ──
+  renderGrupos(byGrupo, horasGrupo);
+
+  // ── GRUPOS CHART ──
+  const grupoNames = ['TUBERAS','PERFILERAS','CORTADORAS','GALVANIZADO'];
+  const grupoColors = {
+    'TUBERAS':'rgba(245,130,10,0.75)', 'PERFILERAS':'rgba(167,139,250,0.75)',
+    'CORTADORAS':'rgba(45,212,191,0.75)', 'GALVANIZADO':'rgba(96,165,250,0.75)'
+  };
+  const gruposBorderColors = {
+    'TUBERAS':'#f5820a','PERFILERAS':'#a78bfa','CORTADORAS':'#2dd4bf','GALVANIZADO':'#60a5fa'
+  };
+
+  // Build per-month datasets
+  const gruposDatasets = meses.map((mes, i) => {
+    const colors = ['rgba(96,165,250,0.75)','rgba(245,130,10,0.75)','rgba(45,212,191,0.75)','rgba(167,139,250,0.75)'];
+    const bcolors = ['#60a5fa','#f5820a','#2dd4bf','#a78bfa'];
+    const mesRecords = records.filter(r=>r.mes===mes);
+    const horasByGrupo = {};
+    mesRecords.forEach(r=>{ horasByGrupo[r.grupo]=(horasByGrupo[r.grupo]||0)+r.horas; });
+    return {
+      label: formatMesLabel(mes),
+      data: grupoNames.map(g=>+(horasByGrupo[g]||0).toFixed(1)),
+      backgroundColor: colors[i % colors.length],
+      borderColor: bcolors[i % bcolors.length],
+      borderWidth:1.5, borderRadius:4,
+    };
+  });
+
+  destroyChart('gruposChart');
+  charts['gruposChart'] = new Chart(document.getElementById('gruposChart'), {
+    type:'bar',
+    data:{ labels:grupoNames, datasets:gruposDatasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true,ticks:{callback:v=>v+' h'}}
+      },
+      plugins:{
+        legend:{ display:true, labels:{color:'#8a93a8',font:{size:11},boxWidth:12,padding:12} },
+        tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw} hrs`}}
+      },
+      animation:{duration:1000}
+    }
+  });
+
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('dashboard').style.animation = 'fadeUp .4s ease';
+}
+
+/* ══════════════════════════════════════
+   HELPERS
+   ══════════════════════════════════════ */
+function countBy(arr, key) {
+  const m = {};
+  arr.forEach(r => { const v=r[key]; if(v) m[v]=(m[v]||0)+1; });
+  return m;
+}
+function sumBy(arr, key, valKey) {
+  const m = {};
+  arr.forEach(r => { const v=r[key]; if(v) m[v]=(m[v]||0)+r[valKey]; });
+  return m;
+}
+function topN(obj, n) {
+  return Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,n);
+}
+function getMes(fecha) {
+  if (!fecha) return '';
+  const s = String(fecha);
+  const m = s.match(/(\d{4})[\/\-](\d{2})/);
+  return m ? m[1]+'-'+m[2] : s.slice(0,7);
+}
+function formatMesLabel(mes) {
+  const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const [y,m] = mes.split('-');
+  return (months[parseInt(m)-1]||m) + ' ' + y;
+}
+function formatPeriodo(fechas) {
+  if (!fechas.length) return '—';
+  const meses = fechas.map(getMes).filter(Boolean).sort();
+  if (!meses.length) return '—';
+  const a = meses[0], b = meses[meses.length-1];
+  return a === b ? formatMesLabel(a) : formatMesLabel(a)+' – '+formatMesLabel(b);
+}
+function animCount(id, target, dur, decimals=0) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let s = null;
+  requestAnimationFrame(function step(ts) {
+    if (!s) s = ts;
+    const p = Math.min((ts-s)/dur, 1);
+    const e = 1-Math.pow(1-p,3);
+    const v = target * e;
+    el.innerHTML = decimals ? v.toFixed(decimals)+'<span> hrs</span>' : Math.round(v);
+    if (p<1) requestAnimationFrame(step);
+  });
+}
+function renderHBar(id, entries, maxVal, bg, fmt) {
+  const wrap = document.getElementById(id);
+  wrap.innerHTML = '';
+  entries.forEach(([name, val]) => {
+    const pct = (val/maxVal*100).toFixed(1);
+    wrap.innerHTML += `<div class="hbar-item">
+      <div class="hbar-header"><span class="hbar-name">${name}</span><span class="hbar-val">${fmt(val)}</span></div>
+      <div class="hbar-track"><div class="hbar-fill" data-w="${pct}%" style="background:${bg}"></div></div>
+    </div>`;
+  });
+  setTimeout(()=>wrap.querySelectorAll('.hbar-fill').forEach(el=>el.style.width=el.dataset.w),200);
+}
+function renderMesSplit(splitId, barsId, byMes, meses, fmt, unit, color1, color2) {
+  const colors = [color2, color1, '#a78bfa','#2dd4bf'];
+  const maxV = Math.max(...Object.values(byMes),1);
+  const split = document.getElementById(splitId);
+  split.innerHTML = '';
+  meses.forEach((mes, i) => {
+    const v = byMes[mes] || 0;
+    const isLast = i === meses.length-1;
+    const delta = i > 0 ? ((v - (byMes[meses[i-1]]||0)) / (byMes[meses[i-1]]||1) * 100).toFixed(1) : null;
+    split.innerHTML += `<div class="mes-block ${isLast?'active':''}">
+      <div class="mes-month">${formatMesLabel(mes)}</div>
+      <div class="mes-num" style="color:${colors[i%colors.length]}">${fmt(v)}</div>
+      <div class="mes-unit">${unit}</div>
+      ${delta!==null?`<div class="mes-delta ${parseFloat(delta)>0?'up':'down'}">${parseFloat(delta)>0?'▲':'▼'} ${Math.abs(delta)}% vs anterior</div>`:'<div class="mes-delta down">↓ Línea base</div>'}
+    </div>`;
+  });
+  const bars = document.getElementById(barsId);
+  bars.innerHTML = '';
+  meses.forEach((mes, i) => {
+    const v = byMes[mes]||0;
+    const pct = (v/maxV*100).toFixed(1);
+    bars.innerHTML += `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12px;color:var(--text2)">${formatMesLabel(mes)}</span>
+        <span style="font-family:'Share Tech Mono';font-size:11px;color:${colors[i%colors.length]}">${fmt(v)}</span>
+      </div>
+      <div style="height:7px;background:var(--border2);border-radius:4px;overflow:hidden">
+        <div class="hbar-fill" data-w="${pct}%" style="background:linear-gradient(90deg,${colors[i%colors.length]},${colors[i%colors.length]}55)"></div>
+      </div>
+    </div>`;
+  });
+  setTimeout(()=>bars.querySelectorAll('.hbar-fill').forEach(el=>el.style.width=el.dataset.w),250);
+}
+function renderGrupos(byGrupo, horasGrupo) {
+  const sorted = topN(horasGrupo, 10);
+  const maxH = sorted[0][1] || 1;
+  const icons = { TUBERAS:'🔩', PERFILERAS:'📐', CORTADORAS:'✂', GALVANIZADO:'🪙' };
+  const gcolors = { TUBERAS:'var(--accent)', PERFILERAS:'#a78bfa', CORTADORAS:'var(--accent3)', GALVANIZADO:'#60a5fa' };
+  const bcolors = { TUBERAS:'var(--accent)', PERFILERAS:'#a78bfa', CORTADORAS:'#2dd4bf', GALVANIZADO:'#60a5fa' };
+  const gc = document.getElementById('grupo-cards');
+  gc.innerHTML = '';
+  sorted.forEach(([nombre, hrs], i) => {
+    const fallas = byGrupo[nombre] || 0;
+    const pct = (hrs/maxH*100).toFixed(0);
+    const color = gcolors[nombre] || 'var(--accent)';
+    const bcolor = bcolors[nombre] || '#f5820a';
+    gc.innerHTML += `<div class="grupo-item ${i===0?'winner':''}">
+      <div class="grupo-icon">${icons[nombre]||'⚙'}</div>
+      <div class="grupo-name">${nombre}</div>
+      <div class="grupo-fallas">${fallas} fallas${i===0?' · Mayor volumen':''}</div>
+      <div class="grupo-hrs" style="color:${color}">${hrs.toFixed(1)} <small>hrs perdidas</small></div>
+      <div class="grupo-bar-track"><div class="grupo-bar-fill" data-w="${pct}%" style="background:${bcolor}"></div></div>
+    </div>`;
+  });
+  setTimeout(()=>gc.querySelectorAll('.grupo-bar-fill').forEach(el=>el.style.width=el.dataset.w),400);
+}
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+/* ── Global chart defaults ── */
+Chart.defaults.color = '#8a93a8';
+Chart.defaults.font.family = "'Barlow Condensed', sans-serif";
+Chart.defaults.font.size = 12;
+
+/* ── Auto-load if URL saved ── */
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved && saved.includes('docs.google.com')) loadData();
+});
+</script>
+</body>
+</html>
